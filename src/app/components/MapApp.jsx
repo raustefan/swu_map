@@ -2,7 +2,9 @@
 
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { createElementFromHTML } from "../../../lib/utils"
-
+import routeColorMap from "../utils/routeColorMap";
+import fetchAndDrawRoutePattern from "../utils/fetchAndDrawRoutePattern";
+import loadRouteIcon from "../utils/loadRouteIcon";
 
 
 // Hauptkomponente der Anwendung
@@ -28,39 +30,11 @@ const App = (data) => {
 
   const activeRoutePolylineRef = useRef(null);
 
-const [showStops, setShowStops] = useState(false);
-
-const routeColorMap = {
-  '1': '#E52229',
-  '2': '#3EAD56',
-  '4': '#09816E',
-  '5': '#1AA9BF',
-  '6': '#F49437',
-  '7': '#B30F6C',
-  '8': '#78418F',
-  '9': '#E09DBC',
-  '10': '#A5A058',
-  '11': '#045EA4',
-  '12': '#B32E2A',
-  '13': '#7CC293',
-  '14': '#2BABE2',
-  '15': '#B282B8',
-  '16': '#DD4B95',
-  '17': '#D6A700',
-
-  // add more routeNumber to color mappings
-};
+  const [showStops, setShowStops] = useState(false);
 
 
-const loadRouteIcon = (routeNumber, callback) => {
-  const imageUrl = `/icons/Linie_${routeNumber}_Pikto.gif`;
-  const fallbackUrl = '/icons/tram_logo.png';
 
-  const img = new Image();
-  img.onload = () => callback(imageUrl);
-  img.onerror = () => callback(fallbackUrl);
-  img.src = imageUrl;
-};
+
 
   const GOOGLE_MAPS_API_KEY = data.apikeys.MAPS_API_KEY;
   const GOOGLE_MAP_ID = data.apikeys.MAP_ID;
@@ -162,56 +136,6 @@ const fetchAllVehiclePositions = useCallback(async () => {
     setIsLoading(false);
   }
 }, [SWU_VEHICLE_TRIP_API_URL]);
-
-
-const fetchAndDrawRoutePattern = async (vehicleNumber) => {
-  try {
-    const response = await fetch(`https://api.swu.de/mobility/v1/vehicle/trip/Pattern?VehicleNumber=${vehicleNumber}&ContentScope=Track`);
-    if (!response.ok) {
-      console.warn(`Pattern request failed: ${response.status}`);
-      return;
-    }
-
-    const data = await response.json();
-    const vehiclePattern = data?.VehiclePattern;
-
-    const trackPoints = vehiclePattern?.PatternData?.TrackPoints;
-    const routeNumber = vehiclePattern?.RouteNumber?.toString();
-    const routeColor = routeColorMap[routeNumber] || '#000000'; // fallback color
-
-    if (!trackPoints || trackPoints.length === 0) {
-      console.warn(`No track points for vehicle ${vehicleNumber}`);
-      return;
-    }
-
-    const path = trackPoints.map(pt => ({
-      lat: pt.Latitude,
-      lng: pt.Longitude
-    }));
-
-    console.log(`Drawing route for vehicle ${vehicleNumber} (route ${routeNumber})`, path);
-
-    if (activeRoutePolylineRef.current) {
-      activeRoutePolylineRef.current.setMap(null);
-    }
-
-    const polyline = new window.google.maps.Polyline({
-      path: path,
-      geodesic: true,
-      strokeColor: routeColor,
-      strokeOpacity: 0.8,
-      strokeWeight: 5,
-      map: googleMapRef.current,
-    });
-
-    activeRoutePolylineRef.current = polyline;
-
-  } catch (err) {
-    console.error(`Error fetching pattern for vehicle ${vehicleNumber}:`, err);
-  }
-};
-
-
 
 
 
@@ -351,7 +275,7 @@ if (existingMarker) {
       shouldFocus: false,
     });
 
-    fetchAndDrawRoutePattern(vehicle.id);
+    fetchAndDrawRoutePattern(vehicle.id, activeRoutePolylineRef, googleMapRef);
   });
 
   vehicleMarkersRef.current[vehicle.id] = marker;
@@ -436,101 +360,6 @@ if (existingMarker) {
   );
 };
 
-
-
-
-const tintIconWithSource = (iconUrl, color, callback) => {
-  const baseImage = new Image();
-  baseImage.src = iconUrl;
-  baseImage.onload = () => {
-    const canvas = document.createElement('canvas');
-    canvas.width = baseImage.width;
-    canvas.height = baseImage.height;
-    const ctx = canvas.getContext('2d');
-
-    ctx.drawImage(baseImage, 0, 0);
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const data = imageData.data;
-
-    const hexToRgb = (hex) => {
-      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-      return result ? {
-        r: parseInt(result[1], 16),
-        g: parseInt(result[2], 16),
-        b: parseInt(result[3], 16)
-      } : null;
-    };
-
-    const tint = hexToRgb(color);
-
-    for (let i = 0; i < data.length; i += 4) {
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
-      const a = data[i + 3];
-
-      if (r === 255 && g === 255 && b === 255 && a > 0) {
-        continue; // keep white parts white
-      }
-
-      data[i] = tint.r;
-      data[i + 1] = tint.g;
-      data[i + 2] = tint.b;
-    }
-
-    ctx.putImageData(imageData, 0, 0);
-    callback(canvas.toDataURL());
-  };
-};
-
-
-const tintIcon = (color, callback) => {
-  const baseImage = new Image();
-  baseImage.src = '/icons/tram_logo.png';
-  baseImage.onload = () => {
-    const canvas = document.createElement('canvas');
-    canvas.width = baseImage.width;
-    canvas.height = baseImage.height;
-    const ctx = canvas.getContext('2d');
-
-    ctx.drawImage(baseImage, 0, 0);
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const data = imageData.data;
-
-    // Convert hex color to RGB
-    const hexToRgb = (hex) => {
-      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-      return result ? {
-        r: parseInt(result[1], 16),
-        g: parseInt(result[2], 16),
-        b: parseInt(result[3], 16)
-      } : null;
-    };
-
-    const tint = hexToRgb(color);
-
-    for (let i = 0; i < data.length; i += 4) {
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
-      const a = data[i + 3];
-
-      // If pixel is white (and opaque), skip it
-      if (r === 255 && g === 255 && b === 255 && a > 0) {
-        continue;
-      }
-
-      // Apply tint
-      data[i] = tint.r;
-      data[i + 1] = tint.g;
-      data[i + 2] = tint.b;
-      // Alpha remains unchanged
-    }
-
-    ctx.putImageData(imageData, 0, 0);
-    callback(canvas.toDataURL());
-  };
-};
 
 
 
