@@ -13,18 +13,21 @@ const App = (data) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showStops, setShowStops] = useState(false);
+  const [activeInfoWindow, setActiveInfoWindow] = useState(null);
 
   const mapRef = useRef(null);
   const googleMapRef = useRef(null);
   const stopMarkersRef = useRef({});
   const vehicleMarkersRef = useRef({});
   const activeRoutePolylineRef = useRef(null);
+  const activeInfoWindowRef = useRef(null); // Ref to hold the active info window
 
-  const GOOGLE_MAPS_API_KEY = data.apikeys.MAPS_API_KEY;
+  const Maps_API_KEY = data.apikeys.MAPS_API_KEY;
   const GOOGLE_MAP_ID = data.apikeys.MAP_ID;
 
   const SWU_STOPS_API_URL = 'https://api.swu.de/mobility/v1/stoppoint/attributes/BaseData';
   const SWU_VEHICLE_TRIP_API_URL = 'https://api.swu.de/mobility/v1/vehicle/trip/Trip';
+  const SWU_DEPARTURES_API_BASE_URL = 'https://api.swu.de/mobility/v1/stoppoint/passage/Departures?Limit=2&StopPointCode=';
 
   const loadGoogleMapsApi = useCallback(() => {
     if (window.google) {
@@ -33,7 +36,7 @@ const App = (data) => {
     }
 
     const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=maps`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${Maps_API_KEY}&libraries=maps`;
     script.async = true;
     script.defer = true;
     script.onload = () => setIsApiLoaded(true);
@@ -42,7 +45,7 @@ const App = (data) => {
       setIsLoading(false);
     };
     document.head.appendChild(script);
-  }, [GOOGLE_MAPS_API_KEY]);
+  }, [Maps_API_KEY]);
 
   const fetchStopData = useCallback(async () => {
     try {
@@ -69,6 +72,19 @@ const App = (data) => {
     }
   }, []);
 
+  const fetchDeparturesData = useCallback(async (stopId) => {
+    try {
+      const response = await fetch(`${SWU_DEPARTURES_API_BASE_URL}${stopId}`);
+      if (!response.ok) throw new Error(`HTTP-Fehler! Status: ${response.status}`);
+
+      const data = await response.json();
+      return data?.StopPointPassage?.DepartureData || [];
+    } catch (err) {
+      console.error(`Fehler beim Abrufen der Abfahrtsdaten für Haltestelle ${stopId}:`, err);
+      return null;
+    }
+  }, [SWU_DEPARTURES_API_BASE_URL]);
+
   const fetchAllVehiclePositions = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -93,6 +109,7 @@ const App = (data) => {
           directionText: v.JourneyData?.DepartureDirectionText,
           bearing: v.PositionData?.Bearing,
           category: v.VehicleCategory,
+          deviation: v.TimeData?.Deviation || 0
         }));
 
       setVehiclesData(activeVehicles);
@@ -120,6 +137,14 @@ const App = (data) => {
         fullscreenControl: false,
       });
 
+      // Close infowindow when clicking on the map
+      googleMapRef.current.addListener('click', () => {
+        if (activeInfoWindowRef.current) {
+          activeInfoWindowRef.current.close();
+          activeInfoWindowRef.current = null;
+        }
+      });
+
       fetchStopData();
       fetchAllVehiclePositions();
       const vehicleIntervalId = setInterval(fetchAllVehiclePositions, 15000);
@@ -140,10 +165,10 @@ const App = (data) => {
 
     stopsData.forEach(stop => {
       const position = { lat: stop.latitude, lng: stop.longitude };
-      const existingMarker = stopMarkersRef.current[stop.id];
+      let existingMarker = stopMarkersRef.current[stop.id];
 
       if (!existingMarker) {
-        stopMarkersRef.current[stop.id] = new window.google.maps.Marker({
+        const marker = new window.google.maps.Marker({
           position,
           map: showStops ? googleMapRef.current : null,
           title: `${stop.name} (Steig: ${stop.platform || 'N/A'})`,
@@ -152,12 +177,62 @@ const App = (data) => {
             scaledSize: new window.google.maps.Size(10, 10),
           },
         });
+
+        marker.addListener('click', async () => {
+          if (activeInfoWindowRef.current) {
+            activeInfoWindowRef.current.close();
+            activeInfoWindowRef.current = null;
+          }
+
+          const departures = await fetchDeparturesData(stop.id);
+
+          let departuresContent;
+          if (departures && departures.length > 0) {
+            departuresContent = departures.slice(0, 2).map(dep => {
+              const scheduledTime = new Date(dep.DepartureTimeScheduled).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+              const actualTime = new Date(dep.DepartureTimeActual).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+              const delayInSeconds = dep.DepartureDeviation || 0;
+              const delayMinutes = Math.floor(Math.abs(delayInSeconds) / 60);
+              const delaySeconds = Math.abs(delayInSeconds) % 60;
+              const delayText = delayInSeconds > 0 ? `+${delayMinutes}min ${delaySeconds}s` : (delayInSeconds < 0 ? `-${delayMinutes}min ${delaySeconds}s` : 'Pünktlich');
+
+              return `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid #eee;">
+                  <span style="font-weight: bold;">Linie ${dep.RouteNumber}</span>
+                  <span>${dep.DepartureDirectionText}</span>
+                  <span> ${scheduledTime}</span>
+                  <span style=" (color: ${delayInSeconds > 60 ? 'red' : (delayInSeconds < 0 ? 'green' : 'inherit')};)">${delayText}</span>
+                </div>
+              `;
+            }).join('');
+          } else {
+            departuresContent = '<div style="padding: 10px; text-align: center; color: #777;">Keine bevorstehenden Abfahrten.</div>';
+          }
+
+          const content = `
+            <div style="min-width: 250px; font-family: sans-serif;">
+              <h3 style="margin: 0 0 10px 0; padding: 0; font-size: 16px; font-weight: bold;">${stop.name}</h3>
+              <div style="margin-top: 10px; border-top: 1px solid #ccc; padding-top: 10px;">
+                ${departuresContent}
+              </div>
+            </div>
+          `;
+
+          const infoWindow = new window.google.maps.InfoWindow({
+            content: content,
+          });
+
+          infoWindow.open(googleMapRef.current, marker);
+          activeInfoWindowRef.current = infoWindow;
+        });
+
+        stopMarkersRef.current[stop.id] = marker;
       } else {
         existingMarker.setPosition(position);
         existingMarker.setMap(showStops ? googleMapRef.current : null);
       }
     });
-  }, [stopsData, showStops]);
+  }, [stopsData, showStops, fetchDeparturesData]);
 
   useEffect(() => {
     if (!googleMapRef.current) return;
@@ -189,18 +264,38 @@ const App = (data) => {
           },
         });
 
+        const absDeviation = Math.abs(vehicle.deviation || 0);
+        const minutes = Math.floor(absDeviation / 60).toString().padStart(2, '0');
+        const seconds = Math.abs(absDeviation % 60).toString().padStart(2, '0');
+
+        let delayText;
+        if (vehicle.deviation > 0) {
+          delayText = `+${minutes}:${seconds} Verspätung`;
+        } else if (vehicle.deviation < 0) {
+          delayText = `-${minutes}:${seconds} zu früh`;
+        } else {
+          delayText = `Pünktlich`;
+        }
+
         const infoWindow = new window.google.maps.InfoWindow({
           headerContent: createElementFromHTML(`<strong style="font-size: 12px;">${vehicle.directionText}</strong>`),
           content: `
-            <div style="min-width: 150px; display:flex; gap:8px; align-items:center;">
+            <div style="min-width: 180px; display:flex; gap:8px; align-items:center;">
               <img src="${iconUrl}" alt="Linienlogo" width="24" height="24" />
-              <div><strong>Fahrzeug ${vehicle.id}</strong></div>
+              <div>
+                <strong>Fahrzeug ${vehicle.id}</strong><br/>
+                <span>${delayText}</span>
+              </div>
             </div>
-          `,
+          `
         });
 
         marker.addListener('click', () => {
+          if (activeInfoWindowRef.current) {
+            activeInfoWindowRef.current.close();
+          }
           infoWindow.open({ anchor: marker, map: googleMapRef.current, shouldFocus: false });
+          activeInfoWindowRef.current = infoWindow;
           fetchAndDrawRoutePattern(vehicle.id, activeRoutePolylineRef, googleMapRef);
         });
 
@@ -210,12 +305,22 @@ const App = (data) => {
   }, [vehiclesData, isLoading]);
 
   return (
-    <div className="min-h-screen bg-gray-100 font-inter text-gray-900 flex flex-col">
-      <header className="bg-blue-600 text-white p-4 shadow-md rounded-b-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h1 className="text-xl lg:text-3xl font-bold text-center sm:text-left">SWU ÖPNV Echtzeitkarte</h1>
-        <div className="flex items-center gap-2 text-sm">
-          <input id="toggleStops" type="checkbox" checked={showStops} onChange={() => setShowStops(prev => !prev)} className="h-4 w-4 text-blue-600" />
-          <label htmlFor="toggleStops" className="cursor-pointer">Haltestellen anzeigen</label>
+    <div className="h-[100dvh] bg-gray-100 font-inter text-gray-900 flex flex-col">
+            <header className="bg-gradient-to-r from-blue-600 to-blue-500 text-white px-6 py-4 shadow-md flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-center sm:text-left">
+          SWU ÖPNV Echtzeitkarte
+        </h1>
+        <div className="flex items-center gap-3 text-sm">
+          <input
+            id="toggleStops"
+            type="checkbox"
+            checked={showStops}
+            onChange={() => setShowStops(prev => !prev)}
+            className="h-5 w-5 text-blue-600 focus:ring focus:ring-white rounded border-none"
+          />
+          <label htmlFor="toggleStops" className="cursor-pointer select-none">
+            Haltestellen anzeigen
+          </label>
         </div>
       </header>
 
@@ -248,7 +353,7 @@ const App = (data) => {
       </main>
 
       <footer className="bg-gray-800 text-white p-4 text-center text-sm rounded-t-lg mt-4">
-        &copy; {new Date().getFullYear()} Echtzeit-ÖPNV-Karte für Ulm. Alle Rechte vorbehalten.
+        &copy; {new Date().getFullYear()} Echtzeit-ÖPNV-Karte für Ulm. Alle Rechte vorbehalten. Wir stehen in keinerlei Verbindung zu den Stadtwerken Ulm.
       </footer>
     </div>
   );
