@@ -1,52 +1,31 @@
 'use client';
 
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { createElementFromHTML } from "../../../lib/utils"
-import routeColorMap from "../utils/routeColorMap";
-import fetchAndDrawRoutePattern from "../utils/fetchAndDrawRoutePattern";
-import loadRouteIcon from "../utils/loadRouteIcon";
+import { createElementFromHTML } from '../../../lib/utils';
+import routeColorMap from '../utils/routeColorMap';
+import fetchAndDrawRoutePattern from '../utils/fetchAndDrawRoutePattern';
+import loadRouteIcon from '../utils/loadRouteIcon';
 
-
-// Hauptkomponente der Anwendung
 const App = (data) => {
-  // Zustand für die Google Maps API-geladen-Status
   const [isApiLoaded, setIsApiLoaded] = useState(false);
-  // Zustand für die Haltestellendaten
   const [stopsData, setStopsData] = useState([]);
-  // Zustand für die Fahrzeugdaten
   const [vehiclesData, setVehiclesData] = useState([]);
-  // Zustand für den Ladezustand
   const [isLoading, setIsLoading] = useState(true);
-  // Zustand für Fehler‚
   const [error, setError] = useState(null);
-  // Referenz für das Karten-DIV-Element
-  const mapRef = useRef(null);
-  // Referenz für das Google Map-Objekt
-  const googleMapRef = useRef(null);
-  // Referenz für die Haltestellen-Marker auf der Karte
-  const stopMarkersRef = useRef({});
-  // Referenz für die Fahrzeug-Marker auf der Karte
-  const vehicleMarkersRef = useRef({});
-
-  const activeRoutePolylineRef = useRef(null);
-
   const [showStops, setShowStops] = useState(false);
 
-
-
-
+  const mapRef = useRef(null);
+  const googleMapRef = useRef(null);
+  const stopMarkersRef = useRef({});
+  const vehicleMarkersRef = useRef({});
+  const activeRoutePolylineRef = useRef(null);
 
   const GOOGLE_MAPS_API_KEY = data.apikeys.MAPS_API_KEY;
   const GOOGLE_MAP_ID = data.apikeys.MAP_ID;
 
-  // URL für die SWU ÖPNV Haltestellen-Basisdaten-API
   const SWU_STOPS_API_URL = 'https://api.swu.de/mobility/v1/stoppoint/attributes/BaseData';
-  // URL für die SWU ÖPNV Fahrzeug-Basisdaten-API (für alle Fahrzeugnummern)
-  const SWU_VEHICLE_BASE_API_URL = 'https://api.swu.de/mobility/v1/vehicle/attributes/BaseData?ContentScope=minimal';
-  // Präfix für die SWU ÖPNV Fahrzeug-Trip-Daten-API (für Live-Positionen)
-  const SWU_VEHICLE_TRIP_API_URL_PREFIX = 'https://api.swu.de/mobility/v1/vehicle/trip/Trip?VehicleNumber=';
+  const SWU_VEHICLE_TRIP_API_URL = 'https://api.swu.de/mobility/v1/vehicle/trip/Trip';
 
-  // Funktion zum Laden der Google Maps JavaScript API
   const loadGoogleMapsApi = useCallback(() => {
     if (window.google) {
       setIsApiLoaded(true);
@@ -57,9 +36,7 @@ const App = (data) => {
     script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=maps`;
     script.async = true;
     script.defer = true;
-    script.onload = () => {
-      setIsApiLoaded(true);
-    };
+    script.onload = () => setIsApiLoaded(true);
     script.onerror = () => {
       setError('Fehler beim Laden der Google Maps API. Bitte überprüfen Sie Ihren API-Schlüssel und Ihre Internetverbindung.');
       setIsLoading(false);
@@ -67,16 +44,13 @@ const App = (data) => {
     document.head.appendChild(script);
   }, [GOOGLE_MAPS_API_KEY]);
 
-  // Funktion zum Abrufen der Haltestellendaten von der SWU API
   const fetchStopData = useCallback(async () => {
     try {
       const response = await fetch(SWU_STOPS_API_URL);
-      if (!response.ok) {
-        throw new Error(`HTTP-Fehler! Status: ${response.status}`);
-      }
-      const data = await response.json();
+      if (!response.ok) throw new Error(`HTTP-Fehler! Status: ${response.status}`);
 
-      if (data && data.StopPointAttributes && Array.isArray(data.StopPointAttributes.StopPointData)) {
+      const data = await response.json();
+      if (data?.StopPointAttributes?.StopPointData?.length) {
         const parsedStops = data.StopPointAttributes.StopPointData.map(stopPoint => ({
           id: stopPoint.StopPointCode,
           name: stopPoint.StopPointName,
@@ -88,72 +62,57 @@ const App = (data) => {
         setStopsData(parsedStops);
       } else {
         setStopsData([]);
-        console.warn('Keine Haltestellendaten von der SWU API erhalten oder unerwartetes Format.', data);
+        console.warn('Keine Haltestellendaten oder unerwartetes Format.', data);
       }
     } catch (err) {
-      console.error("Fehler beim Abrufen der Haltestellendaten:", err);
-      // Fehler wird im Haupt-Error-State behandelt, um nicht mehrere Fehlermeldungen zu überlagern
+      console.error('Fehler beim Abrufen der Haltestellendaten:', err);
     }
-  }, [SWU_STOPS_API_URL]);
+  }, []);
 
-  // Funktion zum Abrufen aller Fahrzeugpositionen
-  const SWU_VEHICLE_TRIP_API_URL = 'https://api.swu.de/mobility/v1/vehicle/trip/Trip';
+  const fetchAllVehiclePositions = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(SWU_VEHICLE_TRIP_API_URL);
+      if (!response.ok) throw new Error(`HTTP-Fehler beim Abrufen der Trip-Daten! Status: ${response.status}`);
 
-const fetchAllVehiclePositions = useCallback(async () => {
-  setIsLoading(true);
-  setError(null);
-  try {
-    const response = await fetch(SWU_VEHICLE_TRIP_API_URL);
-    if (!response.ok) {
-      throw new Error(`HTTP-Fehler beim Abrufen der Trip-Daten! Status: ${response.status}`);
+      const data = await response.json();
+      if (!data?.VehicleTrip?.TripData?.length) {
+        console.warn('Keine oder ungültige Trip-Daten empfangen:', data);
+        setVehiclesData([]);
+        return;
+      }
+
+      const activeVehicles = data.VehicleTrip.TripData
+        .filter(v => v.IsActive && v.PositionData)
+        .map(v => ({
+          id: v.VehicleNumber,
+          latitude: v.PositionData.Latitude,
+          longitude: v.PositionData.Longitude,
+          routeNumber: v.JourneyData?.RouteNumber,
+          directionText: v.JourneyData?.DepartureDirectionText,
+          bearing: v.PositionData?.Bearing,
+          category: v.VehicleCategory,
+        }));
+
+      setVehiclesData(activeVehicles);
+    } catch (err) {
+      console.error('Fehler beim Abrufen der Fahrzeugdaten:', err);
+      setError('Fehler beim Abrufen der Fahrzeugdaten. Versuchen Sie es später erneut.');
+    } finally {
+      setIsLoading(false);
     }
+  }, []);
 
-    const data = await response.json();
+  useEffect(() => loadGoogleMapsApi(), [loadGoogleMapsApi]);
 
-    if (!data || !data.VehicleTrip || !Array.isArray(data.VehicleTrip.TripData)) {
-      console.warn('Keine oder ungültige Trip-Daten empfangen:', data);
-      setVehiclesData([]);
-      return;
-    }
-
-    const activeVehicles = data.VehicleTrip.TripData
-      .filter(v => v.IsActive && v.PositionData)
-      .map(v => ({
-        id: v.VehicleNumber,
-        latitude: v.PositionData.Latitude,
-        longitude: v.PositionData.Longitude,
-        routeNumber: v.JourneyData?.RouteNumber,
-        directionText: v.JourneyData?.DepartureDirectionText,
-        bearing: v.PositionData?.Bearing,
-        category: v.VehicleCategory
-      }));
-
-    setVehiclesData(activeVehicles);
-  } catch (err) {
-    console.error("Fehler beim Abrufen der Fahrzeugdaten:", err);
-    setError('Fehler beim Abrufen der Fahrzeugdaten. Versuchen Sie es später erneut.');
-  } finally {
-    setIsLoading(false);
-  }
-}, [SWU_VEHICLE_TRIP_API_URL]);
-
-
-
-
-  // Initiales Laden der Google Maps API
-  useEffect(() => {
-    loadGoogleMapsApi();
-  }, [loadGoogleMapsApi]);
-
-  // Initialisieren der Karte, sobald die API geladen ist und Daten abrufen
   useEffect(() => {
     if (isApiLoaded && mapRef.current && !googleMapRef.current) {
-      // Standardposition für Ulm
       const ulm = { lat: 48.4011, lng: 9.9877 };
       googleMapRef.current = new window.google.maps.Map(mapRef.current, {
         center: ulm,
         zoom: 13,
-        mapId: GOOGLE_MAP_ID, // Wichtig: ERSETZEN SIE DIES DURCH IHRE EIGENE MAP ID AUS DER GOOGLE CLOUD CONSOLE
+        mapId: GOOGLE_MAP_ID,
         disableDefaultUI: false,
         zoomControl: true,
         streetViewControl: false,
@@ -161,24 +120,17 @@ const fetchAllVehiclePositions = useCallback(async () => {
         fullscreenControl: false,
       });
 
-      // Haltestellendaten einmalig abrufen
       fetchStopData();
-      // Fahrzeugdaten regelmäßig abrufen
       fetchAllVehiclePositions();
-      const vehicleIntervalId = setInterval(fetchAllVehiclePositions, 15000); // Alle 15 Sekunden aktualisieren
-      return () => clearInterval(vehicleIntervalId); // Bereinigung bei Komponenten-Unmount
+      const vehicleIntervalId = setInterval(fetchAllVehiclePositions, 15000);
+      return () => clearInterval(vehicleIntervalId);
     }
   }, [isApiLoaded, fetchStopData, fetchAllVehiclePositions, GOOGLE_MAP_ID]);
 
-  // Aktualisieren der Haltestellen-Marker auf der Karte
   useEffect(() => {
-  if (!googleMapRef.current) return;
+    if (!googleMapRef.current) return;
 
-  // Create or update markers
-  if (stopsData.length > 0) {
     const currentStopIds = new Set(stopsData.map(s => s.id));
-
-    // Remove old markers no longer in data
     for (const stopId in stopMarkersRef.current) {
       if (!currentStopIds.has(stopId)) {
         stopMarkersRef.current[stopId].setMap(null);
@@ -186,11 +138,11 @@ const fetchAllVehiclePositions = useCallback(async () => {
       }
     }
 
-    // Add or update all current markers
     stopsData.forEach(stop => {
       const position = { lat: stop.latitude, lng: stop.longitude };
+      const existingMarker = stopMarkersRef.current[stop.id];
 
-      if (!stopMarkersRef.current[stop.id]) {
+      if (!existingMarker) {
         stopMarkersRef.current[stop.id] = new window.google.maps.Marker({
           position,
           map: showStops ? googleMapRef.current : null,
@@ -201,121 +153,75 @@ const fetchAllVehiclePositions = useCallback(async () => {
           },
         });
       } else {
-        stopMarkersRef.current[stop.id].setPosition(position);
-        stopMarkersRef.current[stop.id].setMap(showStops ? googleMapRef.current : null);
+        existingMarker.setPosition(position);
+        existingMarker.setMap(showStops ? googleMapRef.current : null);
       }
     });
-  }
+  }, [stopsData, showStops]);
 
-  // Toggle visibility of all existing markers
-  if (stopsData.length > 0) {
-    Object.values(stopMarkersRef.current).forEach(marker => {
-      marker.setMap(showStops ? googleMapRef.current : null);
-    });
-  }
-}, [stopsData, showStops]);
-
-  // Aktualisieren der Fahrzeug-Marker auf der Karte
   useEffect(() => {
-    if (googleMapRef.current && vehiclesData.length > 0) {
-      const currentVehicleIds = new Set(vehiclesData.map(v => v.id));
-      for (const vehicleId in vehicleMarkersRef.current) {
-        if (!currentVehicleIds.has(vehicleId)) {
-          vehicleMarkersRef.current[vehicleId].setMap(null);
-          delete vehicleMarkersRef.current[vehicleId];
-        }
+    if (!googleMapRef.current) return;
+
+    const currentVehicleIds = new Set(vehiclesData.map(v => v.id));
+    for (const id in vehicleMarkersRef.current) {
+      if (!currentVehicleIds.has(id)) {
+        vehicleMarkersRef.current[id].setMap(null);
+        delete vehicleMarkersRef.current[id];
       }
-
-      vehiclesData.forEach(vehicle => {
-        const position = { lat: vehicle.latitude, lng: vehicle.longitude };
-        if (vehicleMarkersRef.current[vehicle.id]) {
-          vehicleMarkersRef.current[vehicle.id].setPosition(position);
-        } else {
-
-
-const routeColor = routeColorMap[vehicle.routeNumber] || '#888888';
-
-const existingMarker = vehicleMarkersRef.current[vehicle.id];
-
-if (existingMarker) {
-  existingMarker.setPosition(position);
-} else {
-  const baseIconUrl = vehicle.category === 1 ? '/icons/tram_logo.png' : '/icons/bus_logo.png';
-  const routeColor = routeColorMap[vehicle.routeNumber] || '#888888';
-
-  loadRouteIcon(vehicle.routeNumber, (iconUrl) => {
-  const marker = new window.google.maps.Marker({
-    position: { lat: vehicle.latitude, lng: vehicle.longitude },
-    map: googleMapRef.current,
-    title: `Fahrzeug ${vehicle.id} (Linie: ${vehicle.routeNumber || 'N/A'}, Richtung: ${vehicle.directionText || 'N/A'})`,
-    icon: {
-      url: iconUrl,
-      scaledSize: new window.google.maps.Size(20, 20),
-    },
-  });
-
-  const infoWindow = new window.google.maps.InfoWindow({
-  headerContent:
-    createElementFromHTML(`<strong style="font-size: 12px‚;">${vehicle.directionText}</strong>`)
-  ,
-  content: `
-    <div style="min-width: 150px; display:flex; gap:8px; align-items:center;">
-      <img src="${iconUrl}" alt="Linienlogo" width="24" height="24" />
-      <div>
-        <strong>Fahrzeug ${vehicle.id}</strong>
-      </div>
-    </div>
-  `
-});
-
-  marker.addListener('click', () => {
-    infoWindow.open({
-      anchor: marker,
-      map: googleMapRef.current,
-      shouldFocus: false,
-    });
-
-    fetchAndDrawRoutePattern(vehicle.id, activeRoutePolylineRef, googleMapRef);
-  });
-
-  vehicleMarkersRef.current[vehicle.id] = marker;
-});
-}
-        }
-      });
-    } else if (googleMapRef.current && vehiclesData.length === 0 && !isLoading) {
-      for (const vehicleId in vehicleMarkersRef.current) {
-        vehicleMarkersRef.current[vehicleId].setMap(null);
-      }
-      vehicleMarkersRef.current = {};
     }
-  }, [vehiclesData, isLoading]);
 
+    vehiclesData.forEach(vehicle => {
+      const position = { lat: vehicle.latitude, lng: vehicle.longitude };
+
+      if (vehicleMarkersRef.current[vehicle.id]) {
+        vehicleMarkersRef.current[vehicle.id].setPosition(position);
+        return;
+      }
+
+      loadRouteIcon(vehicle.routeNumber, (iconUrl) => {
+        const marker = new window.google.maps.Marker({
+          position,
+          map: googleMapRef.current,
+          title: `Fahrzeug ${vehicle.id} (Linie: ${vehicle.routeNumber || 'N/A'}, Richtung: ${vehicle.directionText || 'N/A'})`,
+          icon: {
+            url: iconUrl,
+            scaledSize: new window.google.maps.Size(20, 20),
+          },
+        });
+
+        const infoWindow = new window.google.maps.InfoWindow({
+          headerContent: createElementFromHTML(`<strong style="font-size: 12px;">${vehicle.directionText}</strong>`),
+          content: `
+            <div style="min-width: 150px; display:flex; gap:8px; align-items:center;">
+              <img src="${iconUrl}" alt="Linienlogo" width="24" height="24" />
+              <div><strong>Fahrzeug ${vehicle.id}</strong></div>
+            </div>
+          `,
+        });
+
+        marker.addListener('click', () => {
+          infoWindow.open({ anchor: marker, map: googleMapRef.current, shouldFocus: false });
+          fetchAndDrawRoutePattern(vehicle.id, activeRoutePolylineRef, googleMapRef);
+        });
+
+        vehicleMarkersRef.current[vehicle.id] = marker;
+      });
+    });
+  }, [vehiclesData, isLoading]);
 
   return (
     <div className="min-h-screen bg-gray-100 font-inter text-gray-900 flex flex-col">
       <header className="bg-blue-600 text-white p-4 shadow-md rounded-b-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-  <h1 className="text-xl lg:text-3xl font-bold text-center sm:text-left">
-    SWU ÖPNV Echtzeitkarte
-  </h1>
-  <div className="flex items-center gap-2 text-sm">
-    <input
-      id="toggleStops"
-      type="checkbox"
-      checked={showStops}
-      onChange={() => setShowStops(prev => !prev)}
-      className="h-4 w-4 text-blue-600"
-    />
-    <label htmlFor="toggleStops" className="cursor-pointer">
-      Haltestellen anzeigen
-    </label>
-  </div>
-</header>
+        <h1 className="text-xl lg:text-3xl font-bold text-center sm:text-left">SWU ÖPNV Echtzeitkarte</h1>
+        <div className="flex items-center gap-2 text-sm">
+          <input id="toggleStops" type="checkbox" checked={showStops} onChange={() => setShowStops(prev => !prev)} className="h-4 w-4 text-blue-600" />
+          <label htmlFor="toggleStops" className="cursor-pointer">Haltestellen anzeigen</label>
+        </div>
+      </header>
 
-      <main className="flex-grow flex flex-col p-0"> {/* p-0 für den Rand-zu-Rand-Effekt der Karte */}
-        {/* Nachrichtenbereich (Ladezustand, Fehler, Hinweise) */}
+      <main className="flex-grow flex flex-col p-0">
         {(error || (stopsData.length === 0 && !isLoading && !error && vehiclesData.length === 0)) && (
-          <div className="w-full bg-white rounded-lg shadow-xl p-4 m-4 mx-auto max-w-4xl text-center"> {/* Mit Padding für den Inhalt */}
+          <div className="w-full bg-white rounded-lg shadow-xl p-4 m-4 mx-auto max-w-4xl text-center">
             {error && (
               <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-2" role="alert">
                 <strong className="font-bold">Fehler: </strong>
@@ -325,10 +231,6 @@ if (existingMarker) {
                 </p>
               </div>
             )}
-
-
-
-
 
             {!isLoading && stopsData.length === 0 && vehiclesData.length === 0 && !error && (
               <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative mb-2" role="alert">
@@ -342,15 +244,7 @@ if (existingMarker) {
           </div>
         )}
 
-        {/* Kartenbereich */}
-        <div
-          ref={mapRef}
-          className="flex-grow w-full h-full" // Karte füllt verfügbaren Platz aus
-          style={{ minHeight: '500px' }} // Mindesthöhe für die Karte
-          aria-label="Google Maps Karte mit ÖPNV Haltestellen und Fahrzeugen"
-        >
-          {/* Die Karte wird hier von Google Maps API gerendert */}
-        </div>
+        <div ref={mapRef} className="flex-grow w-full h-full" style={{ minHeight: '500px' }} aria-label="Google Maps Karte mit ÖPNV Haltestellen und Fahrzeugen" />
       </main>
 
       <footer className="bg-gray-800 text-white p-4 text-center text-sm rounded-t-lg mt-4">
@@ -359,8 +253,5 @@ if (existingMarker) {
     </div>
   );
 };
-
-
-
 
 export default App;
