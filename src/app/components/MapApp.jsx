@@ -1,8 +1,12 @@
+'use client';
+
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { createElementFromHTML } from "../../../lib/utils"
 
+
+
 // Hauptkomponente der Anwendung
-const App = () => {
+const App = (data) => {
   // Zustand für die Google Maps API-geladen-Status
   const [isApiLoaded, setIsApiLoaded] = useState(false);
   // Zustand für die Haltestellendaten
@@ -58,7 +62,8 @@ const loadRouteIcon = (routeNumber, callback) => {
   img.src = imageUrl;
 };
 
-
+  const GOOGLE_MAPS_API_KEY = data.apikeys.MAPS_API_KEY;
+  const GOOGLE_MAP_ID = data.apikeys.MAP_ID;
 
   // URL für die SWU ÖPNV Haltestellen-Basisdaten-API
   const SWU_STOPS_API_URL = 'https://api.swu.de/mobility/v1/stoppoint/attributes/BaseData';
@@ -66,12 +71,6 @@ const loadRouteIcon = (routeNumber, callback) => {
   const SWU_VEHICLE_BASE_API_URL = 'https://api.swu.de/mobility/v1/vehicle/attributes/BaseData?ContentScope=minimal';
   // Präfix für die SWU ÖPNV Fahrzeug-Trip-Daten-API (für Live-Positionen)
   const SWU_VEHICLE_TRIP_API_URL_PREFIX = 'https://api.swu.de/mobility/v1/vehicle/trip/Trip?VehicleNumber=';
-
-  // WICHTIG: ERSETZEN SIE DIESEN PLATZHALTER durch Ihren tatsächlichen Google Maps API-Schlüssel
-  const GOOGLE_MAPS_API_KEY = 'AIzaSyAtg-HmpKFYHHPKJkqy2waA7IbVDf2TI_Q';
-  // WICHTIG: ERSETZEN SIE DIESEN PLATZHALTER durch Ihre eigene Map ID aus der Google Cloud Console
-  // Eine Map ID ist erforderlich, um bestimmte Funktionen wie Cloud-basierte Kartenstile zu nutzen.
-  const GOOGLE_MAP_ID = 'd337c43756ff1931140662c3';
 
   // Funktion zum Laden der Google Maps JavaScript API
   const loadGoogleMapsApi = useCallback(() => {
