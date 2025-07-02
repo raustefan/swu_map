@@ -7,6 +7,8 @@ import fetchAndDrawRoutePattern from '../utils/fetchAndDrawRoutePattern';
 import loadRouteIcon from '../utils/loadRouteIcon';
 
 const App = (data) => {
+  const [activeStopData, setActiveStopData] = useState(null);
+  
   const [isApiLoaded, setIsApiLoaded] = useState(false);
   const [stopsData, setStopsData] = useState([]);
   const [vehiclesData, setVehiclesData] = useState([]);
@@ -174,56 +176,17 @@ const App = (data) => {
           title: `${stop.name} (Steig: ${stop.platform || 'N/A'})`,
           icon: {
             url: '/icons/stop_point.svg',
-            scaledSize: new window.google.maps.Size(10, 10),
+            scaledSize: new window.google.maps.Size(12, 12),
           },
         });
 
         marker.addListener('click', async () => {
-          if (activeInfoWindowRef.current) {
-            activeInfoWindowRef.current.close();
-            activeInfoWindowRef.current = null;
-          }
-
           const departures = await fetchDeparturesData(stop.id);
 
-          let departuresContent;
-          if (departures && departures.length > 0) {
-            departuresContent = departures.slice(0, 2).map(dep => {
-              const scheduledTime = new Date(dep.DepartureTimeScheduled).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-              const actualTime = new Date(dep.DepartureTimeActual).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-              const delayInSeconds = dep.DepartureDeviation || 0;
-              const delayMinutes = Math.floor(Math.abs(delayInSeconds) / 60);
-              const delaySeconds = Math.abs(delayInSeconds) % 60;
-              const delayText = delayInSeconds > 0 ? `+${delayMinutes}min ${delaySeconds}s` : (delayInSeconds < 0 ? `-${delayMinutes}min ${delaySeconds}s` : 'Pünktlich');
-
-              return `
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid #eee;">
-                  <span style="font-weight: bold;">Linie ${dep.RouteNumber}</span>
-                  <span>${dep.DepartureDirectionText}</span>
-                  <span> ${scheduledTime}</span>
-                  <span style=" (color: ${delayInSeconds > 60 ? 'red' : (delayInSeconds < 0 ? 'green' : 'inherit')};)">${delayText}</span>
-                </div>
-              `;
-            }).join('');
-          } else {
-            departuresContent = '<div style="padding: 10px; text-align: center; color: #777;">Keine bevorstehenden Abfahrten.</div>';
-          }
-
-          const content = `
-            <div style="min-width: 250px; font-family: sans-serif;">
-              <h3 style="margin: 0 0 10px 0; padding: 0; font-size: 16px; font-weight: bold;">${stop.name}</h3>
-              <div style="margin-top: 10px; border-top: 1px solid #ccc; padding-top: 10px;">
-                ${departuresContent}
-              </div>
-            </div>
-          `;
-
-          const infoWindow = new window.google.maps.InfoWindow({
-            content: content,
+          setActiveStopData({
+            stop,
+            departures,
           });
-
-          infoWindow.open(googleMapRef.current, marker);
-          activeInfoWindowRef.current = infoWindow;
         });
 
         stopMarkersRef.current[stop.id] = marker;
@@ -304,22 +267,44 @@ const App = (data) => {
     });
   }, [vehiclesData, isLoading]);
 
+
+
+
+
+
+
+
+
+
+
   return (
     <div className="h-[100dvh] bg-gray-100 font-inter text-gray-900 flex flex-col">
-            <header className="bg-gradient-to-r from-blue-600 to-blue-500 text-white px-6 py-4 shadow-md flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <header className="bg-gradient-to-r from-blue-800 to-blue-500 text-white px-6 py-4 shadow-md flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-center sm:text-left">
-          SWU ÖPNV Echtzeitkarte
+          Ulmiversität ÖPNV Echtzeitkarte
         </h1>
         <div className="flex items-center gap-3 text-sm">
-          <input
-            id="toggleStops"
-            type="checkbox"
-            checked={showStops}
-            onChange={() => setShowStops(prev => !prev)}
-            className="h-5 w-5 text-blue-600 focus:ring focus:ring-white rounded border-none"
-          />
-          <label htmlFor="toggleStops" className="cursor-pointer select-none">
-            Haltestellen anzeigen
+          <label htmlFor="toggleStops" className="flex items-center cursor-pointer">
+            {/* Switch Container */}
+            <div className="relative">
+              {/* Hidden Checkbox */}
+              <input
+                type="checkbox"
+                id="toggleStops"
+                checked={showStops}
+                onChange={() => setShowStops(prev => !prev)}
+                className="sr-only"
+              />
+              {/* Track */}
+              <div className="block w-12 h-7 bg-white rounded-full border border-white shadow-inner"></div>
+              {/* Thumb */}
+              <div
+                className={`absolute top-1 left-1 w-5 h-5 rounded-full transition-all duration-200 ease-in-out
+                  ${showStops ? 'translate-x-5 bg-blue-500' : 'bg-gray-400'}`}
+              ></div>
+            </div>
+            {/* Label */}
+            <span className="ml-3 select-none text-white">Haltestellen anzeigen</span>
           </label>
         </div>
       </header>
@@ -352,9 +337,64 @@ const App = (data) => {
         <div ref={mapRef} className="flex-grow w-full h-full" style={{ minHeight: '500px' }} aria-label="Google Maps Karte mit ÖPNV Haltestellen und Fahrzeugen" />
       </main>
 
-      <footer className="bg-gray-800 text-white p-4 text-center text-sm rounded-t-lg mt-4">
+      <footer className="bg-gray-800 text-white p-2 text-center text-sm">
         &copy; {new Date().getFullYear()} Echtzeit-ÖPNV-Karte für Ulm. Alle Rechte vorbehalten. Wir stehen in keinerlei Verbindung zu den Stadtwerken Ulm.
       </footer>
+      {activeStopData && (
+  <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center px-4">
+    <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 relative">
+      <button
+        onClick={() => setActiveStopData(null)}
+        className="absolute top-3 right-3 text-gray-500 hover:text-gray-700 text-xl"
+        aria-label="Schließen"
+      >
+        &times;
+      </button>
+      <h2 className="text-xl font-bold mb-4">{activeStopData.stop.name}</h2>
+
+      {activeStopData.departures && activeStopData.departures.length > 0 ? (
+        <ul className="space-y-3">
+          {activeStopData.departures.slice(0, 2).map((dep, i) => {
+            const scheduled = new Date(dep.DepartureTimeScheduled).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+            const actual = new Date(dep.DepartureTimeActual).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+            const deviation = dep.DepartureDeviation || 0;
+            const delayMinutes = Math.floor(Math.abs(deviation) / 60);
+            const delaySeconds = Math.abs(deviation % 60);
+            const delayText = deviation > 0
+              ? `+${delayMinutes}min ${delaySeconds}s`
+              : (deviation < 0
+                  ? `-${delayMinutes}min ${delaySeconds}s`
+                  : 'Pünktlich');
+
+            return (
+              <li key={i} className="border-b pb-2">
+                <div className="flex justify-between text-sm">
+                  <span className="font-semibold">Linie {dep.RouteNumber}</span>
+                  <span>{dep.DepartureDirectionText}</span>
+                  <span>{scheduled}</span>
+                  <span className={`font-semibold ${deviation > 60 ? 'text-red-500' : deviation < 0 ? 'text-green-600' : ''}`}>
+                    {delayText}
+                  </span>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <div className="text-gray-600">Keine bevorstehenden Abfahrten.</div>
+      )}
+
+      <div className="mt-6 text-right">
+        <button
+          onClick={() => setActiveStopData(null)}
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+        >
+          Schließen
+        </button>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 };
