@@ -1,7 +1,5 @@
 import Head from 'next/head';
-import MapApp from './components/MapApp';
-
-
+import MapApp from './App';
 
 export default function Home() {
 
