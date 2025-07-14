@@ -34,22 +34,14 @@ export default function ExampleMenu() {
               <ArrowSvg />
 
             </Menu.Arrow>
-            <Menu.Item className={styles.Item}>
-              <div className={styles.ItemContent}>
-                <span>Add to Library</span>
-                <ExampleSwitch
-                  checked={switchStates.addToLibrary}
-                  onChange={() => handleToggle('addToLibrary')}
-                />
-              </div>
-            </Menu.Item>
+
 
 
 <Menu.Item className={styles.Item}>
   <div className={styles.ItemContent}>
     <span>Linienfilter</span>
     <div style={{ marginLeft: '12px' }}>
-      <ExampleSwitch />
+     
     </div>
   </div>
 </Menu.Item>
@@ -59,7 +51,7 @@ export default function ExampleMenu() {
   <div className={styles.ItemContent}>
     <span>Standort</span>
     <div style={{ marginLeft: '12px' }}>
-      <ExampleSwitch />
+     
     </div>
   </div>
 </Menu.Item>
