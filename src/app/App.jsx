@@ -7,6 +7,7 @@ import fetchAndDrawRoutePattern from './utils/fetchAndDrawRoutePattern';
 import { loadGoogleMapsApi, initializeMap, createStopMarker, createVehicleMarker } from './utils/googleMapsUtils';
 import { fetchStopData, fetchDeparturesData, fetchAllVehiclePositions } from './services/swuService';
 import StopDetailsModal from './components/StopDetailsModal';
+import ExampleMenu from './components/ExampleMenu'; // adjust path if needed
 
 const App = ({ apikeys }) => { // Reverted to accepting 'data' prop
   // Destructure keys from data.apikeys
@@ -21,7 +22,7 @@ const App = ({ apikeys }) => { // Reverted to accepting 'data' prop
   const [vehiclesData, setVehiclesData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [showStops, setShowStops] = useState(false);
+  const [showStops, setShowStops] = useState(true);
 
   // Refs for Google Maps objects and markers
   const mapRef = useRef(null);
@@ -148,30 +149,34 @@ const App = ({ apikeys }) => { // Reverted to accepting 'data' prop
 
   return (
     <div className="h-[100dvh] bg-gray-100 font-inter text-gray-900 flex flex-col">
-      <header className="bg-gradient-to-r from-blue-800 to-blue-500 text-white px-6 py-4 shadow-md flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <header className="bg-gradient-to-r from-blue-800 to-blue-500 text-white px-6 py-4 shadow-md flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:gap-6 w-full justify-between">
         <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-center sm:text-left">
           Ulmiversität Echtzeitkarte
         </h1>
-        <div className="flex items-center gap-3 text-sm">
-          <label htmlFor="toggleStops" className="flex items-center cursor-pointer">
-            <div className="relative">
-              <input
-                type="checkbox"
-                id="toggleStops"
-                checked={showStops}
-                onChange={() => setShowStops(prev => !prev)}
-                className="sr-only"
-              />
-              <div className="block w-12 h-7 bg-white rounded-full border border-white shadow-inner"></div>
-              <div
-                className={`absolute top-1 left-1 w-5 h-5 rounded-full transition-all duration-200 ease-in-out
-                  ${showStops ? 'translate-x-5 bg-blue-500' : 'bg-gray-400'}`}
-              ></div>
-            </div>
-            <span className="ml-3 select-none text-white">Haltestellen anzeigen</span>
-          </label>
-        </div>
-      </header>
+        <ExampleMenu />
+      </div>
+
+      <div className="flex items-center gap-3 text-sm justify-end w-full sm:w-auto">
+        <label htmlFor="toggleStops" className="flex items-center cursor-pointer">
+          <div className="relative">
+            <input
+              type="checkbox"
+              id="toggleStops"
+              checked={showStops}
+              onChange={() => setShowStops(prev => !prev)}
+              className="sr-only"
+            />
+            <div className="block w-12 h-7 bg-white rounded-full border border-white shadow-inner"></div>
+            <div
+              className={`absolute top-1 left-1 w-5 h-5 rounded-full transition-all duration-200 ease-in-out
+                ${showStops ? 'translate-x-5 bg-blue-500' : 'bg-gray-400'}`}
+            ></div>
+          </div>
+          <span className="ml-3 select-none text-white">Haltestellen anzeigen</span>
+        </label>
+      </div>
+    </header>
 
       <main className="flex-grow flex flex-col p-0">
         {(error || (stopsData.length === 0 && !isLoading && !error && vehiclesData.length === 0)) && (
