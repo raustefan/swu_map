@@ -83,14 +83,22 @@ export function createVehicleMarker(
   const minutes = Math.floor(absDeviation / 60).toString().padStart(2, '0');
   const seconds = Math.abs(absDeviation % 60).toString().padStart(2, '0');
 
-  let delayText;
-  if (vehicle.deviation > 0) {
-    delayText = `+${minutes}:${seconds} Verspätung`;
-  } else if (vehicle.deviation < 0) {
-    delayText = `-${minutes}:${seconds} zu früh`;
-  } else {
-    delayText = `Pünktlich`;
-  }
+let delayText = '';
+let delayColor = '';
+
+if (vehicle.deviation < 0) {
+  delayText = `+${minutes}:${seconds} Verspätung`;
+  delayColor = 'red';
+} else if (vehicle.deviation > 0) {
+  delayText = `-${minutes}:${seconds} zu früh`;
+  delayColor = 'green';
+} else {
+  delayText = `Pünktlich`;
+  delayColor = 'gray';
+}
+
+// Example usage in HTML or React:
+const delayDisplay = `<span style="color: ${delayColor}">${delayText}</span>`;
 
   const infoWindow = new window.google.maps.InfoWindow({
     headerContent: createElementFromHTML(`<strong style="font-size: 12px;">${vehicle.directionText}</strong>`),
@@ -99,7 +107,7 @@ export function createVehicleMarker(
         <img src="${iconUrl}" alt="Linienlogo" width="24" height="24" />
         <div>
           <strong>Fahrzeug ${vehicle.id}</strong><br/>
-          <span>${delayText}</span>
+          <span>${delayDisplay}</span>
         </div>
       </div>
     `
