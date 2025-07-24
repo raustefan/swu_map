@@ -14,20 +14,27 @@ const StopDetailsModal = ({ activeStopData, setActiveStopData, routeIcons }) => 
         >
           &times;
         </button>
+
+        {/* StopNr anzeigen */}
+        <div className="text-sm text-gray-500 mb-1">StopNr: {activeStopData.stop.id}</div>
         <h2 className="text-xl font-bold mb-4">{activeStopData.stop.name}</h2>
 
         {activeStopData.departures && activeStopData.departures.length > 0 ? (
           <ul className="space-y-3">
             {activeStopData.departures.slice(0, 6).map((dep, i) => {
-              const scheduled = new Date(dep.DepartureTimeScheduled).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+              const scheduled = new Date(dep.DepartureTimeScheduled).toLocaleTimeString('de-DE', {
+                hour: '2-digit',
+                minute: '2-digit',
+              });
               const deviation = dep.DepartureDeviation || 0;
               const delayMinutes = Math.floor(Math.abs(deviation) / 60);
               const delaySeconds = Math.abs(deviation % 60);
-              const delayText = deviation > 0
-                ? `+${delayMinutes}min ${delaySeconds}s`
-                : (deviation < 0
+              const delayText =
+                deviation > 0
+                  ? `+${delayMinutes}min ${delaySeconds}s`
+                  : deviation < 0
                   ? `-${delayMinutes}min ${delaySeconds}s`
-                  : 'Pünktlich');
+                  : 'Pünktlich';
 
               return (
                 <li key={i} className="border-b pb-3 last:border-none">
@@ -43,7 +50,11 @@ const StopDetailsModal = ({ activeStopData, setActiveStopData, routeIcons }) => 
                     </div>
                     <span
                       className={`font-semibold text-sm ${
-                        deviation > 0 ? 'text-red-600' : deviation < 0 ? 'text-green-600' : 'text-gray-700'
+                        deviation > 0
+                          ? 'text-red-600'
+                          : deviation < 0
+                          ? 'text-green-600'
+                          : 'text-gray-700'
                       }`}
                     >
                       {delayText}
