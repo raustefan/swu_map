@@ -1,5 +1,11 @@
 const loadRouteIcon = (routeNumber, callback) => {
-  const imageUrl = `/icons/Linie_${routeNumber}_Pikto.gif`;
+  // Use a more concise way to handle route number mapping
+  const mappedRouteNumber = {
+    '101': '1',
+    '102': '2',
+  }[routeNumber] || routeNumber;
+
+  const imageUrl = `/icons/Linie_${mappedRouteNumber}_Pikto.gif`;
   const fallbackUrl = '/icons/tram_logo.png';
 
   const img = new Image();
@@ -10,8 +16,10 @@ const loadRouteIcon = (routeNumber, callback) => {
     const fallbackImg = new Image();
     fallbackImg.onload = () => callback(fallbackUrl);
     fallbackImg.onerror = () => {
-      console.error('Both primary and fallback route icons failed to load.');
-      callback(null); // or fallbackUrl again, or a placeholder
+      console.error(
+        'Both primary and fallback route icons failed to load.'
+      );
+      callback(null); // It's often good to provide null or a specific error state
     };
     fallbackImg.src = fallbackUrl;
   };
