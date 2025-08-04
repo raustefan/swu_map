@@ -1,16 +1,14 @@
 // src/app/App.jsx
 'use client';
 
-import React, { useEffect, useState, useRef } from 'react'; // Removed useCallback as it's not strictly necessary with this structure now
+import React, { useEffect, useState, useRef } from 'react';
 import loadRouteIcon from './utils/loadRouteIcon';
 import fetchAndDrawRoutePattern from './utils/fetchAndDrawRoutePattern';
 import { loadGoogleMapsApi, initializeMap, createStopMarker, createVehicleMarker } from './utils/googleMapsUtils';
 import { fetchStopData, fetchDeparturesData, fetchAllVehiclePositions } from './services/swuService';
 import StopDetailsModal from './components/StopDetailsModal';
-import ExampleMenu from './components/ExampleMenu'; // adjust path if needed
 
-const App = ({ apikeys }) => { // Reverted to accepting 'data' prop
-  // Destructure keys from data.apikeys
+const App = ({ apikeys }) => {
   const Maps_API_KEY = apikeys.MAPS_API_KEY;
   const GOOGLE_MAP_ID = apikeys.MAP_ID;
 
@@ -48,14 +46,12 @@ const App = ({ apikeys }) => { // Reverted to accepting 'data' prop
 
   // Effect to load Google Maps API on component mount
   useEffect(() => {
-    // Pass Maps_API_KEY directly
     loadGoogleMapsApi(Maps_API_KEY, setIsApiLoaded, setError, setIsLoading);
-  }, [Maps_API_KEY]); // Dependency on Maps_API_KEY
+  }, [Maps_API_KEY]);
 
   // Effect to initialize the map and fetch initial data
   useEffect(() => {
     if (isApiLoaded && mapRef.current && !googleMapRef.current) {
-      // Pass GOOGLE_MAP_ID directly
       initializeMap(mapRef, googleMapRef, activeInfoWindowRef, GOOGLE_MAP_ID);
 
       const fetchData = async () => {
@@ -79,7 +75,7 @@ const App = ({ apikeys }) => { // Reverted to accepting 'data' prop
       }, 15000);
       return () => clearInterval(vehicleIntervalId);
     }
-  }, [isApiLoaded, GOOGLE_MAP_ID]); // Dependencies on isApiLoaded and GOOGLE_MAP_ID
+  }, [isApiLoaded, GOOGLE_MAP_ID]);
 
   // Effect to manage stop markers on the map
   useEffect(() => {
@@ -141,73 +137,215 @@ const App = ({ apikeys }) => { // Reverted to accepting 'data' prop
           googleMapRef
         );
 
-
         vehicleMarkersRef.current[vehicle.id] = marker;
       });
     });
   }, [vehiclesData, isLoading]);
 
   return (
-    <div className="h-[100dvh] bg-gray-100 font-inter text-gray-900 flex flex-col">
-    <header className="bg-gradient-to-r from-blue-800 to-blue-500 text-white px-6 py-4 shadow-md flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:gap-6 w-full justify-between">
-        <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-center sm:text-left">
-          Ulmiversität Echtzeitkarte
-        </h1>
-        <ExampleMenu />
+    <div className="h-[100dvh] bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 font-inter text-white flex flex-col overflow-hidden relative">
+      {/* Animated Background */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-blue-400/20 to-purple-600/20 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-tr from-cyan-400/20 to-blue-600/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
       </div>
 
-      <div className="flex items-center gap-3 text-sm justify-end w-full sm:w-auto">
-        <label htmlFor="toggleStops" className="flex items-center cursor-pointer">
-          <div className="relative">
-            <input
-              type="checkbox"
-              id="toggleStops"
-              checked={showStops}
-              onChange={() => setShowStops(prev => !prev)}
-              className="sr-only"
-            />
-            <div className="block w-12 h-7 bg-white rounded-full border border-white shadow-inner"></div>
-            <div
-              className={`absolute top-1 left-1 w-5 h-5 rounded-full transition-all duration-200 ease-in-out
-                ${showStops ? 'translate-x-5 bg-blue-500' : 'bg-gray-400'}`}
-            ></div>
+      {/* Futuristic Header */}
+      <header className="relative z-20">
+        <div className="absolute inset-0 bg-gradient-to-r from-indigo-600/90 via-purple-600/90 to-pink-600/90 backdrop-blur-xl"></div>
+        <div className="absolute inset-0 bg-black/20"></div>
+        
+        <div className="relative px-4 py-5 sm:px-6 sm:py-6">
+          <div className="flex items-center justify-between">
+            {/* Logo & Title */}
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-white/30 to-white/10 rounded-2xl backdrop-blur-sm border border-white/20 flex items-center justify-center shadow-2xl">
+                  <svg className="w-5 h-5 sm:w-7 sm:h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </div>
+                <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full border-2 border-white animate-pulse sm:w-4 sm:h-4"></div>
+              </div>
+              
+              <div>
+                <h1 className="text-xl sm:text-2xl lg:text-3xl font-black bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent">
+                  Ulmiversität
+                </h1>
+                <p className="text-white/70 text-sm font-medium tracking-wide">Live Transit Map</p>
+              </div>
+            </div>
+
+            {/* Stats & Controls */}
+            <div className="flex items-center gap-2 sm:gap-3">
+              {/* Toggle Button - Show only on larger screens */}
+              <button
+                onClick={() => setShowStops(prev => !prev)}
+                className={`relative group px-3 py-2 sm:px-4 sm:py-3 rounded-2xl font-medium text-sm transition-all duration-300 border backdrop-blur-sm shadow-lg
+                  ${showStops 
+                    ? 'bg-white/20 border-white/30 text-white' 
+                    : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10'
+                  }`}
+              >
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full transition-colors duration-300 ${showStops ? 'bg-green-400' : 'bg-gray-400'}`}></div>
+                  <span className="hidden sm:inline">Haltestellen</span>
+                  <span className="sm:hidden">Stops</span>
+                </div>
+              </button>
+
+              {/* Compact Status Display - Show on mobile */}
+              <div className="sm:hidden">
+                <div className={`w-2 h-2 rounded-full ${isLoading ? 'bg-yellow-400 animate-pulse' : error ? 'bg-red-400' : 'bg-green-400'}`}></div>
+              </div>
+
+              {/* Detailed Stats Card - Hidden on mobile */}
+              <div className="hidden sm:flex items-center gap-3 bg-white/10 backdrop-blur-sm rounded-2xl px-3 py-2 sm:px-4 sm:py-3 border border-white/20 shadow-lg">
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${isLoading ? 'bg-yellow-400 animate-pulse' : error ? 'bg-red-400' : 'bg-green-400'}`}></div>
+                  <div className="flex flex-col">
+                    <span className="text-lg font-bold text-white">
+                      {vehiclesData.length}
+                    </span>
+                    <span className="text-xs text-white/70 -mt-1">Fahrzeuge</span>
+                  </div>
+                </div>
+                
+                <div className="w-px h-6 bg-white/20"></div>
+                
+                <div className="flex items-center gap-2">
+                  <svg className="w-4 h-4 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  </svg>
+                  <div className="flex flex-col">
+                    <span className="text-lg font-bold text-white">
+                      {stopsData.length}
+                    </span>
+                    <span className="text-xs text-white/70 -mt-1">Haltestellen</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-          <span className="ml-3 select-none text-white">Haltestellen anzeigen</span>
-        </label>
-      </div>
-    </header>
+        </div>
+      </header>
 
-      <main className="flex-grow flex flex-col p-0">
-        {(error || (stopsData.length === 0 && !isLoading && !error && vehiclesData.length === 0)) && (
-          <div className="w-full bg-white rounded-lg shadow-xl p-4 m-4 mx-auto max-w-4xl text-center">
-            {error && (
-              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-2" role="alert">
-                <strong className="font-bold">Fehler: </strong>
-                <span className="block sm:inline">{error}</span>
-                <p className="text-sm mt-1">
-                  Bitte stellen Sie sicher, dass Ihr Google Maps API-Schlüssel korrekt ist, die richtige Map ID verwendet wird und dass die SWU-APIs zugänglich sind.
-                </p>
+      {/* Floating Error/Status Cards */}
+      {(error || (stopsData.length === 0 && !isLoading && !error && vehiclesData.length === 0)) && (
+        <div className="absolute top-16 left-4 right-4 z-30 max-w-md mx-auto">
+          {error && (
+            <div className="bg-red-500/90 backdrop-blur-xl rounded-3xl p-4 border border-red-400/30 shadow-2xl">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 bg-red-400/20 rounded-2xl flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5 text-red-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="font-bold text-white mb-1">Verbindungsfehler</h3>
+                  <p className="text-red-100 text-sm leading-relaxed">{error}</p>
+                </div>
               </div>
-            )}
+            </div>
+          )}
 
-            {!isLoading && stopsData.length === 0 && vehiclesData.length === 0 && !error && (
-              <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative mb-2" role="alert">
-                <strong className="font-bold">Hinweis: </strong>
-                <span className="block sm:inline">Keine Haltestellen oder Fahrzeuge gefunden oder Daten noch nicht verfügbar.</span>
-                <p className="text-sm mt-1">
-                  Die Karte wird sich automatisch aktualisieren, sobald Daten verfügbar sind.
-                </p>
+          {!isLoading && stopsData.length === 0 && vehiclesData.length === 0 && !error && (
+            <div className="bg-amber-500/90 backdrop-blur-xl rounded-3xl p-4 border border-amber-400/30 shadow-2xl">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 bg-amber-400/20 rounded-2xl flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5 text-amber-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="font-bold text-white mb-1">Keine Daten</h3>
+                  <p className="text-amber-100 text-sm leading-relaxed">Warten auf Live-Daten...</p>
+                </div>
               </div>
-            )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Map Container with Floating Controls */}
+      <main className="flex-1 relative overflow-hidden">
+        <div 
+          ref={mapRef} 
+          className="w-full h-full"
+          style={{ minHeight: '400px' }}
+          aria-label="Google Maps Karte mit ÖPNV Haltestellen und Fahrzeugen"
+        />
+        
+        {/* Floating Map Controls */}
+        <div className="absolute bottom-4 left-4 flex flex-col gap-2 z-10">
+          {/* Live Indicator */}
+          <div className="bg-black/80 backdrop-blur-xl rounded-2xl px-3 py-2 border border-white/10 shadow-2xl">
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                <div className="absolute inset-0 w-2 h-2 bg-green-400 rounded-full animate-ping opacity-75"></div>
+              </div>
+              <span className="text-white font-medium text-sm">Live</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Loading Overlay */}
+        {isLoading && (
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-900/95 to-indigo-900/95 backdrop-blur-sm flex items-center justify-center z-20">
+            <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-6 border border-white/20 shadow-2xl">
+              <div className="flex flex-col items-center gap-4">
+                <div className="relative">
+                  <div className="w-12 h-12 border-4 border-white/20 border-t-white rounded-full animate-spin"></div>
+                  <div className="absolute inset-2 w-8 h-8 border-4 border-transparent border-t-blue-400 rounded-full animate-spin animate-reverse"></div>
+                </div>
+                <div className="text-center">
+                  <h3 className="text-xl font-bold text-white mb-1">Karte wird geladen</h3>
+                  <p className="text-white/70 text-sm">Verbindung zu Live-Daten...</p>
+                </div>
+              </div>
+            </div>
           </div>
         )}
-
-        <div ref={mapRef} className="flex-grow w-full h-full" style={{ minHeight: '500px' }} aria-label="Google Maps Karte mit ÖPNV Haltestellen und Fahrzeugen" />
       </main>
 
-      <footer className="bg-gray-800 text-white p-2 text-center text-sm">
-        Ulmiversität ÖPNV-Karte (beta). <a href="https://ulmiversitaet.de/impressum/" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-300">Impressum</a>. Daten von <a href="https://api.swu.de/" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-300">SWU-API</a>
+      {/* Futuristic Footer */}
+      <footer className="relative z-20 bg-black/40 backdrop-blur-xl border-t border-white/10">
+        <div className="px-4 py-3 sm:px-6">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-sm">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                <span className="text-white/90 font-medium">Ulmiversität Transit</span>
+              </div>
+              <div className="px-2 py-0.5 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-full border border-blue-400/30">
+                <span className="text-blue-300 font-medium text-xs">BETA</span>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-4 text-white/70">
+              <a 
+                href="https://ulmiversitaet.de/impressum/" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="hover:text-white transition-colors duration-200 hover:underline"
+              >
+                Impressum
+              </a>
+              <div className="flex items-center gap-1">
+                <span>Powered by</span>
+                <a 
+                  href="https://api.swu.de/" 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="text-blue-400 hover:text-blue-300 transition-colors duration-200 font-medium"
+                >
+                  SWU API
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
       </footer>
 
       <StopDetailsModal
