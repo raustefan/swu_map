@@ -374,4 +374,4 @@ export const findOptimalRoute = async (
 
   console.log("A* result:", result);
   return [result];
-};
+}; 
