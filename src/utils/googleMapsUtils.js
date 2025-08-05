@@ -1,6 +1,6 @@
 // src/utils/googleMapsUtils.js
 import { INITIAL_MAP_CENTER, INITIAL_MAP_ZOOM } from '../config/mapConfig';
-import { createElementFromHTML } from '../../../lib/utils';
+import { createElementFromHTML } from '../../lib/utils';
 import fetchAndDrawRoutePattern from './fetchAndDrawRoutePattern';
 
 export function loadGoogleMapsApi(Maps_API_KEY, setIsApiLoaded, setError, setIsLoading) {

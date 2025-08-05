@@ -2,13 +2,16 @@
 'use client';
 
 import React, { useEffect, useState, useRef } from 'react';
-import loadRouteIcon from './utils/loadRouteIcon';
-import fetchAndDrawRoutePattern from './utils/fetchAndDrawRoutePattern';
-import { loadGoogleMapsApi, initializeMap, createStopMarker, createVehicleMarker } from './utils/googleMapsUtils';
-import { fetchStopData, fetchDeparturesData, fetchAllVehiclePositions } from './services/swuService';
-import StopDetailsModal from './components/StopDetailsModal';
+import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
+import loadRouteIcon from '../utils/loadRouteIcon';
+import fetchAndDrawRoutePattern from '../utils/fetchAndDrawRoutePattern';
+import { loadGoogleMapsApi, initializeMap, createStopMarker, createVehicleMarker } from '../utils/googleMapsUtils';
+import { fetchStopData, fetchDeparturesData, fetchAllVehiclePositions } from '../services/swuService';
+import StopDetailsModal from '../components/StopDetailsModal';
+import DestinationFinder from '../components/DestinationFinder';
 
-const App = ({ apikeys }) => {
+// Map Component (extracted from main App)
+const MapView = ({ apikeys }) => {
   const Maps_API_KEY = apikeys.MAPS_API_KEY;
   const GOOGLE_MAP_ID = apikeys.MAP_ID;
 
@@ -143,93 +146,7 @@ const App = ({ apikeys }) => {
   }, [vehiclesData, isLoading]);
 
   return (
-    <div className="h-[100dvh] bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 font-inter text-white flex flex-col overflow-hidden relative">
-      {/* Animated Background */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-blue-400/20 to-purple-600/20 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-tr from-cyan-400/20 to-blue-600/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
-      </div>
-
-      {/* Futuristic Header */}
-      <header className="relative z-20">
-        <div className="absolute inset-0 bg-gradient-to-r from-indigo-600/90 via-purple-600/90 to-pink-600/90 backdrop-blur-xl"></div>
-        <div className="absolute inset-0 bg-black/20"></div>
-        
-        <div className="relative px-4 py-5 sm:px-6 sm:py-6">
-          <div className="flex items-center justify-between">
-            {/* Logo & Title */}
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-white/30 to-white/10 rounded-2xl backdrop-blur-sm border border-white/20 flex items-center justify-center shadow-2xl">
-                  <svg className="w-5 h-5 sm:w-7 sm:h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                </div>
-                <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full border-2 border-white animate-pulse sm:w-4 sm:h-4"></div>
-              </div>
-              
-              <div>
-                <h1 className="text-xl sm:text-2xl lg:text-3xl font-black bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent">
-                  Ulmiversität
-                </h1>
-                <p className="text-white/70 text-sm font-medium tracking-wide">Live Transit Map</p>
-              </div>
-            </div>
-
-            {/* Stats & Controls */}
-            <div className="flex items-center gap-2 sm:gap-3">
-              {/* Toggle Button - Show only on larger screens */}
-              <button
-                onClick={() => setShowStops(prev => !prev)}
-                className={`relative group px-3 py-2 sm:px-4 sm:py-3 rounded-2xl font-medium text-sm transition-all duration-300 border backdrop-blur-sm shadow-lg
-                  ${showStops 
-                    ? 'bg-white/20 border-white/30 text-white' 
-                    : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10'
-                  }`}
-              >
-                <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full transition-colors duration-300 ${showStops ? 'bg-green-400' : 'bg-gray-400'}`}></div>
-                  <span className="hidden sm:inline">Haltestellen</span>
-                  <span className="sm:hidden">Stops</span>
-                </div>
-              </button>
-
-              {/* Compact Status Display - Show on mobile */}
-              <div className="sm:hidden">
-                <div className={`w-2 h-2 rounded-full ${isLoading ? 'bg-yellow-400 animate-pulse' : error ? 'bg-red-400' : 'bg-green-400'}`}></div>
-              </div>
-
-              {/* Detailed Stats Card - Hidden on mobile */}
-              <div className="hidden sm:flex items-center gap-3 bg-white/10 backdrop-blur-sm rounded-2xl px-3 py-2 sm:px-4 sm:py-3 border border-white/20 shadow-lg">
-                <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${isLoading ? 'bg-yellow-400 animate-pulse' : error ? 'bg-red-400' : 'bg-green-400'}`}></div>
-                  <div className="flex flex-col">
-                    <span className="text-lg font-bold text-white">
-                      {vehiclesData.length}
-                    </span>
-                    <span className="text-xs text-white/70 -mt-1">Fahrzeuge</span>
-                  </div>
-                </div>
-                
-                <div className="w-px h-6 bg-white/20"></div>
-                
-                <div className="flex items-center gap-2">
-                  <svg className="w-4 h-4 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  </svg>
-                  <div className="flex flex-col">
-                    <span className="text-lg font-bold text-white">
-                      {stopsData.length}
-                    </span>
-                    <span className="text-xs text-white/70 -mt-1">Haltestellen</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
-
+    <>
       {/* Floating Error/Status Cards */}
       {(error || (stopsData.length === 0 && !isLoading && !error && vehiclesData.length === 0)) && (
         <div className="absolute top-16 left-4 right-4 z-30 max-w-md mx-auto">
@@ -290,6 +207,21 @@ const App = ({ apikeys }) => {
           </div>
         </div>
 
+        {/* Navigation to Route Planner */}
+        <div className="absolute top-4 right-4 z-10">
+          <Link 
+            to="/route-planner"
+            className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-4 py-2 rounded-2xl font-medium transition-all duration-300 shadow-lg backdrop-blur-sm border border-white/20"
+          >
+            <div className="flex items-center gap-2">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-1.447-.894L15 4m0 13V4m0 0L9 7" />
+              </svg>
+              Route Planner
+            </div>
+          </Link>
+        </div>
+
         {/* Loading Overlay */}
         {isLoading && (
           <div className="absolute inset-0 bg-gradient-to-br from-slate-900/95 to-indigo-900/95 backdrop-blur-sm flex items-center justify-center z-20">
@@ -309,51 +241,164 @@ const App = ({ apikeys }) => {
         )}
       </main>
 
-      {/* Futuristic Footer */}
-      <footer className="relative z-20 bg-black/40 backdrop-blur-xl border-t border-white/10">
-        <div className="px-4 py-3 sm:px-6">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-sm">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1">
-                <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-                <span className="text-white/90 font-medium">Ulmiversität Transit</span>
-              </div>
-              <div className="px-2 py-0.5 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-full border border-blue-400/30">
-                <span className="text-blue-300 font-medium text-xs">BETA</span>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-4 text-white/70">
-              <a 
-                href="https://ulmiversitaet.de/impressum/" 
-                target="_blank" 
-                rel="noopener noreferrer" 
-                className="hover:text-white transition-colors duration-200 hover:underline"
-              >
-                Impressum
-              </a>
-              <div className="flex items-center gap-1">
-                <span>Powered by</span>
-                <a 
-                  href="https://api.swu.de/" 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  className="text-blue-400 hover:text-blue-300 transition-colors duration-200 font-medium"
-                >
-                  SWU API
-                </a>
-              </div>
-            </div>
-          </div>
-        </div>
-      </footer>
-
       <StopDetailsModal
         activeStopData={activeStopData}
         setActiveStopData={setActiveStopData}
         routeIcons={routeIcons}
       />
-    </div>
+
+      {/* Toggle Button in Header Controls */}
+      <div className="absolute top-20 right-4 z-10">
+        <button
+          onClick={() => setShowStops(prev => !prev)}
+          className={`relative group px-3 py-2 sm:px-4 sm:py-3 rounded-2xl font-medium text-sm transition-all duration-300 border backdrop-blur-sm shadow-lg
+            ${showStops 
+              ? 'bg-white/20 border-white/30 text-white' 
+              : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10'
+            }`}
+        >
+          <div className="flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full transition-colors duration-300 ${showStops ? 'bg-green-400' : 'bg-gray-400'}`}></div>
+            <span className="hidden sm:inline">Haltestellen</span>
+            <span className="sm:hidden">Stops</span>
+          </div>
+        </button>
+      </div>
+    </>
+  );
+};
+
+// Navigation Header Component
+const AppHeader = () => {
+  const location = useLocation();
+  const isRoutePlanner = location.pathname === '/route-planner';
+
+  return (
+    <header className="relative z-20">
+      <div className="absolute inset-0 bg-gradient-to-r from-indigo-600/90 via-purple-600/90 to-pink-600/90 backdrop-blur-xl"></div>
+      <div className="absolute inset-0 bg-black/20"></div>
+      
+      <div className="relative px-4 py-5 sm:px-6 sm:py-6">
+        <div className="flex items-center justify-between">
+          {/* Logo & Title */}
+          <Link to="/" className="flex items-center gap-3">
+            <div className="relative">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-white/30 to-white/10 rounded-2xl backdrop-blur-sm border border-white/20 flex items-center justify-center shadow-2xl">
+                <svg className="w-5 h-5 sm:w-7 sm:h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+              <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full border-2 border-white animate-pulse sm:w-4 sm:h-4"></div>
+            </div>
+            
+            <div>
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-black bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent">
+                Ulmiversität
+              </h1>
+              <p className="text-white/70 text-sm font-medium tracking-wide">
+                {isRoutePlanner ? 'Route Planner' : 'Live Transit Map'}
+              </p>
+            </div>
+          </Link>
+
+          {/* Navigation */}
+          <div className="flex items-center gap-3">
+            <Link
+              to="/"
+              className={`px-4 py-2 rounded-2xl font-medium text-sm transition-all duration-300 border backdrop-blur-sm shadow-lg ${
+                !isRoutePlanner
+                  ? 'bg-white/20 border-white/30 text-white'
+                  : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-1.447-.894L15 4m0 13V4m0 0L9 7" />
+                </svg>
+                <span className="hidden sm:inline">Live Map</span>
+              </div>
+            </Link>
+
+            <Link
+              to="/route-planner"
+              className={`px-4 py-2 rounded-2xl font-medium text-sm transition-all duration-300 border backdrop-blur-sm shadow-lg ${
+                isRoutePlanner
+                  ? 'bg-white/20 border-white/30 text-white'
+                  : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                </svg>
+                <span className="hidden sm:inline">Route Planner</span>
+              </div>
+            </Link>
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+};
+
+// Main App Component with Router
+const App = ({ apikeys }) => {
+  return (
+    <Router>
+      <div className="h-[100dvh] bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 font-inter text-white flex flex-col overflow-hidden relative">
+        {/* Animated Background */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-blue-400/20 to-purple-600/20 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-tr from-cyan-400/20 to-blue-600/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
+        </div>
+
+        <AppHeader />
+
+        <Routes>
+          <Route path="/" element={<MapView apikeys={apikeys} />} />
+          <Route path="/route-planner" element={<DestinationFinder />} />
+        </Routes>
+
+        {/* Futuristic Footer */}
+        <footer className="relative z-20 bg-black/40 backdrop-blur-xl border-t border-white/10">
+          <div className="px-4 py-3 sm:px-6">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-sm">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1">
+                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                  <span className="text-white/90 font-medium">Ulmiversität Transit</span>
+                </div>
+                <div className="px-2 py-0.5 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-full border border-blue-400/30">
+                  <span className="text-blue-300 font-medium text-xs">BETA</span>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-4 text-white/70">
+                <a 
+                  href="https://ulmiversitaet.de/impressum/" 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="hover:text-white transition-colors duration-200 hover:underline"
+                >
+                  Impressum
+                </a>
+                <div className="flex items-center gap-1">
+                  <span>Powered by</span>
+                  <a 
+                    href="https://api.swu.de/" 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="text-blue-400 hover:text-blue-300 transition-colors duration-200 font-medium"
+                  >
+                    SWU API
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </footer>
+      </div>
+    </Router>
   );
 };
 

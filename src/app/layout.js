@@ -1,28 +1,41 @@
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+// src/app/layout.jsx
+import './globals.css'; // Your Tailwind and global CSS
 
 export const metadata = {
-  title: "Ulmiversität Echtzeitkarte",
-  description: "Powered by SWU API",
+  title: 'Public Transport Route Planner',
+  description: 'Find the best public transport connections in Ulm and Neu-Ulm.',
 };
 
 export default function RootLayout({ children }) {
+  // This script runs immediately after the HTML is parsed, before React hydrates.
+  // It checks for user preference (localStorage) or system preference (media query)
+  // and adds the 'dark' class to html if needed, preventing FOUC.
+  const themeScript = `
+    (function() {
+      try {
+        const theme = localStorage.getItem('theme'); // Check for user's saved preference
+        const isSystemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+        if (theme === 'dark' || (theme === null && isSystemDark)) {
+          document.documentElement.classList.add('dark');
+        }
+      } catch (e) {
+        console.error("Theme script failed", e);
+      }
+    })();
+  `;
+
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        {children}
+      {/* Inject the script directly into the <head> */}
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        {/* Other head elements like metadata, title will go here */}
+      </head>
+      <body>
+        <div className="app-container">
+          {children}
+        </div>
       </body>
     </html>
   );

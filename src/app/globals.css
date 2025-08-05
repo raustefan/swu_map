@@ -1,14 +1,18 @@
+/* src/app/globals.css */
+
 @import "tailwindcss";
 
 :root {
+  /* These are CSS variables, Tailwind won't directly use them for utility classes unless configured */
   --background: #ffffff;
   --foreground: #171717;
 }
 
+/* Ensure these are correctly applied if you're using a custom theme in Tailwind */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-geist-sans); /* Assuming these are defined elsewhere or placeholders */
   --font-mono: var(--font-geist-mono);
 }
 
@@ -20,7 +24,27 @@
 }
 
 body {
+  /* Tailwind's preflight already sets basic box-sizing, etc. */
+  /* We explicitly set these for full height and scrolling behavior */
+  min-height: 100vh; /* Ensure body takes at least the full viewport height */
+  display: flex; /* Make body a flex container */
+  flex-direction: column; /* Stack children vertically (e.g., header, main, footer) */
+  overflow-x: hidden; /* Prevent horizontal scrolling */
+  overflow-y: auto; /* Enable vertical scrolling for the entire page */
+
+  /* Your existing background and color vars */
   background: var(--background);
   color: var(--foreground);
+
+  /* Your existing font-family */
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* If Next.js adds a div like #__next or #root around your app, ensure it also flex-grows */
+/* This is often handled by default with min-h-screen on html/body and then flex containers */
+/* If you still have scrolling issues, you might need to target the root div */
+/* #__next {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+} */
