@@ -41,3 +41,6 @@ export const SWU_LIVE_VEHICLE_POSITIONS_URL = `${SWU_API_BASE}/vehicle/trip/Trip
 // will be limited (e.g., only show specific vehicles you hardcode).
 export const SWU_DEPARTURES_API_BASE_URL =
   `${SWU_API_BASE}/stop/passage/Departures?StopNumber=`;
+
+  export const SWU_STOP_DEPARTURES_API_URL = `${SWU_API_BASE}/stop/passage/Departures`;
+export const SWU_STOP_ARRIVALS_API_URL = `${SWU_API_BASE}/stop/passage/Arrivals`;

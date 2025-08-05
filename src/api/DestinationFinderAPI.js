@@ -1,27 +1,19 @@
-// src/api/DestinationFinderAPI.js
-
 import {
   SWU_STOPS_API_URL,
-  SWU_STOPPOINTS_API_URL, // New import for stoppoint coordinates
+  SWU_STOPPOINTS_API_URL,
+  SWU_STOP_DEPARTURES_API_URL,
+  SWU_STOP_ARRIVALS_API_URL,
 } from '../config/apiEndpoints';
 import { fetchRawRouteBaseDataWithPatterns } from '../services/swuRoutingService';
 
-// Caches for all stops and compiled route patterns
 let allStopsCache = null;
 let compiledRoutePatternsCache = null;
 
-// New caches for stop and stoppoint lookup by ID/number
 let stopsByIdCache = new Map();
 let stopPointsByIdCache = new Map();
 
-/**
- * Fetches and caches all stops and stoppoints for coordinate lookup
- * and general search/autocomplete purposes.
- * This is crucial for enriching route pattern data with geographic coordinates.
- */
 export const fetchAllStopsAndStopPointsBaseData = async () => {
   if (allStopsCache && stopsByIdCache.size && stopPointsByIdCache.size) {
-    // If all caches are populated, return existing data
     return {
       allStops: allStopsCache,
       stopsById: stopsByIdCache,
@@ -31,7 +23,6 @@ export const fetchAllStopsAndStopPointsBaseData = async () => {
 
   console.log('DF-API: Fetching all stops and stoppoints (extended)...');
 
-  // Fetch all stops
   const resStops = await fetch(SWU_STOPS_API_URL);
   if (!resStops.ok) {
     const txt = await resStops.text().catch(() => '');
@@ -44,7 +35,7 @@ export const fetchAllStopsAndStopPointsBaseData = async () => {
 
   const transformedStops = rawStops
     .map((s) => ({
-      id: s.StopNumber, // Use StopNumber as the primary ID
+      id: s.StopNumber,
       name: s.StopName,
       city:
         s.StopName?.includes('Ulm') || s.StopName?.includes('Neu-Ulm')
@@ -65,7 +56,6 @@ export const fetchAllStopsAndStopPointsBaseData = async () => {
   stopsByIdCache = new Map(transformedStops.map((s) => [s.id, s]));
   console.log(`DF-API: Cached main stops: ${allStopsCache.length}`);
 
-  // Fetch all stoppoints (for more granular coordinates if available)
   const resStopPoints = await fetch(SWU_STOPPOINTS_API_URL);
   if (!resStopPoints.ok) {
     const txt = await resStopPoints.text().catch(() => '');
@@ -82,8 +72,8 @@ export const fetchAllStopsAndStopPointsBaseData = async () => {
     const lng = sp?.StopPointCoordinates?.Longitude;
     if (typeof lat === 'number' && typeof lng === 'number') {
       stopPointsByIdCache.set(sp.StopPointNumber, {
-        id: sp.StopPointNumber, // Using StopPointNumber as its ID
-        stopNumber: sp.ParentStop?.StopNumber, // Link back to parent stop
+        id: sp.StopPointNumber,
+        stopNumber: sp.ParentStop?.StopNumber,
         name: sp.StopPointName || sp.PlatformName,
         coordinates: { lat, lng },
       });
@@ -98,21 +88,78 @@ export const fetchAllStopsAndStopPointsBaseData = async () => {
   };
 };
 
-// Local search over cached stops (for autocomplete)
 export const searchStops = async (query) => {
   const q = `${query}`.trim().toLowerCase();
   if (q.length < 3) return [];
-  const { allStops } = await fetchAllStopsAndStopPointsBaseData(); // Use new fetch function
+  const { allStops } = await fetchAllStopsAndStopPointsBaseData();
   return allStops.filter((s) => s.name?.toLowerCase().includes(q)).slice(0, 12);
 };
 
-// Optional: get details for a stop id
 export const getStopDetails = async (stopId) => {
-  const { stopsById } = await fetchAllStopsAndStopPointsBaseData(); // Use new fetch function
+  const { stopsById } = await fetchAllStopsAndStopPointsBaseData();
   return stopsById.get(stopId) || null;
 };
 
-// Build A* connections from Route BaseData RoutePattern (robust!)
+export const fetchPassageDataForStop = async (stopNumber, limit = 30) => {
+  if (stopNumber == null) {
+    console.warn('fetchPassageDataForStop: stopNumber is null or undefined.');
+    return [];
+  }
+  try {
+    const departuresRes = await fetch(
+      `${SWU_STOP_DEPARTURES_API_URL}?StopNumber=${stopNumber}&Limit=${limit}`,
+    );
+    const arrivalsRes = await fetch(
+      `${SWU_STOP_ARRIVALS_API_URL}?StopNumber=${stopNumber}&Limit=${limit}`,
+    );
+
+    if (!departuresRes.ok && !arrivalsRes.ok) {
+      const depTxt = await departuresRes.text().catch(() => '');
+      const arrTxt = await arrivalsRes.text().catch(() => '');
+      throw new Error(
+        `Failed to fetch passages for stop ${stopNumber}. Departures: ${departuresRes.status} ${depTxt}, Arrivals: ${arrivalsRes.status} ${arrTxt}`,
+      );
+    }
+
+    const departuresData = departuresRes.ok
+      ? await departuresRes.json()
+      : { PassageAttributes: { PassageData: [] } };
+    const arrivalsData = arrivalsRes.ok
+      ? await arrivalsRes.json()
+      : { PassageAttributes: { PassageData: [] } };
+
+    const allPassages = [
+      ...(departuresData?.PassageAttributes?.PassageData || []),
+      ...(arrivalsData?.PassageAttributes?.PassageData || []),
+    ];
+
+    const uniquePassages = new Map();
+    allPassages.forEach((p) => {
+      const key = `${p.RouteNumber}-${p.VehicleNumber}-${
+        p.DepartureTimeActual ||
+        p.DepartureTimeScheduled ||
+        p.ArrivalTimeScheduled
+      }`;
+      if (!uniquePassages.has(key)) uniquePassages.set(key, p);
+    });
+
+    const sortedPassages = Array.from(uniquePassages.values()).sort((a, b) => {
+      const t = (x) =>
+        new Date(
+          x.DepartureTimeActual ||
+            x.DepartureTimeScheduled ||
+            x.ArrivalTimeScheduled,
+        ).getTime();
+      return t(a) - t(b);
+    });
+
+    return sortedPassages;
+  } catch (error) {
+    console.error(`Error fetching passage data for stop ${stopNumber}:`, error);
+    return [];
+  }
+};
+
 export const getRouteConnections = async () => {
   if (compiledRoutePatternsCache) {
     console.log(
@@ -122,7 +169,6 @@ export const getRouteConnections = async () => {
     return compiledRoutePatternsCache;
   }
 
-  // Fetch stop and stoppoint coordinates
   const { stopsById, stopPointsById } =
     await fetchAllStopsAndStopPointsBaseData();
 
@@ -142,7 +188,6 @@ export const getRouteConnections = async () => {
     const routeType = route?.RouteCategory === 1 ? 'TRAM' : 'BUS';
 
     const directions = route?.RouteDirections || [];
-    // Handle RoutePattern as array or object.
     const patternsRaw = route?.RoutePattern;
     const patterns = Array.isArray(patternsRaw)
       ? patternsRaw
@@ -170,13 +215,11 @@ export const getRouteConnections = async () => {
         ? [spsRaw]
         : [];
       if (routeStopPoints.length < 2) {
-        return; // Need at least two points to form a segment
+        return;
       }
 
-      // Enrich StopPoints from RoutePattern with actual coordinates
       const transformedStops = routeStopPoints
         .map((sp) => {
-          // Attempt to get coordinates from StopPoint first, then Stop
           const coordinates =
             stopPointsById.get(sp.StopPointNumber)?.coordinates ||
             stopsById.get(sp.StopNumber)?.coordinates;
@@ -186,7 +229,6 @@ export const getRouteConnections = async () => {
             typeof coordinates.lat !== 'number' ||
             typeof coordinates.lng !== 'number'
           ) {
-            // This StopPoint or Stop does not have valid coordinates, skip it
             console.warn(
               `DF-API: StopPoint ${sp.StopPointNumber}/${sp.StopNumber} missing coordinates.`,
             );
@@ -194,13 +236,13 @@ export const getRouteConnections = async () => {
           }
 
           return {
-            id: sp.StopNumber, // Use StopNumber as the consistent ID for graph nodes
-            stopPointNumber: sp.StopPointNumber, // Keep for context if needed
+            id: sp.StopNumber,
+            stopPointNumber: sp.StopPointNumber,
             name: sp.StopName || sp.StopPointName,
             coordinates: coordinates,
           };
         })
-        .filter(Boolean); // Filter out any nulls from stops with missing coordinates
+        .filter(Boolean);
 
       if (transformedStops.length < 2) {
         console.warn(
@@ -210,7 +252,7 @@ export const getRouteConnections = async () => {
       }
 
       compiled.push({
-        id: `${routeNumber}-${dirCode}`, // Unique ID for this specific route pattern
+        id: `${routeNumber}-${dirCode}`,
         number: routeNumber,
         name: routeName,
         type: routeType,

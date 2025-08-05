@@ -76,41 +76,60 @@ export default function DestinationFinderPage() {
     setEndSuggestions([]); // Clear suggestions after selection
   };
 
-  const handleSearch = async () => {
-    setErr(null);
-    setRoutes([]); // Clear previous routes
-    if (!selectedStart || !selectedEnd) {
-      setErr('Please select both a start and end location from the suggestions.');
-      return;
-    }
+  // In src/app/route-planner/page.jsx
 
-    if (selectedStart.id === selectedEnd.id) {
-      setErr('Start and end locations cannot be the same.');
-      return;
-    }
+const handleSearch = async () => {
+  setErr(null);
+  setRoutes([]);
+  if (!selectedStart || !selectedEnd) {
+    setErr("Please select both a start and end location from the suggestions.");
+    return;
+  }
 
-    try {
-      setLoading(true);
-      console.log('DF: Starting route calculation...');
-      // getRouteConnections will internally call fetchAllStopsAndStopPointsBaseData
-      const connections = await getRouteConnections();
-      console.log('DF: Retrieved connections for A* =', connections.length);
+  if (selectedStart.id === selectedEnd.id) {
+    setErr("Start and end locations cannot be the same.");
+    return;
+  }
 
-      const optimal = findOptimalRoute(selectedStart, selectedEnd, connections);
+  try {
+    setLoading(true);
+    console.log("DF: Starting route calculation...");
+    const connections = await getRouteConnections();
+    console.log("DF: Retrieved connections for A* =", connections.length);
 
-      if (optimal.length === 0) {
-        setErr(
-          'No route found. (Perhaps no continuous pattern between stops or data issues)',
-        );
-      }
+    // Define the start time to pass to the algorithm
+    const startTime = new Date();
+
+    // --- THE FIX IS HERE: Added 'await' and 'startTime' ---
+    const optimal = await findOptimalRoute(
+      selectedStart,
+      selectedEnd,
+      connections,
+      startTime,
+    );
+    // ----------------------------------------------------
+
+    console.log("DF: Received optimal routes from A*:", optimal); // New log to confirm
+
+    if (!optimal || optimal.length === 0) {
+      setErr(
+        "No route found. (No suitable departures/arrivals found soon or data issues)",
+      );
+      setRoutes([]); // Ensure routes is an empty array
+    } else {
+      // The result from A* should already be in the correct format.
+      // If you still need normalization, you can do it here, but let's
+      // trust the output of the algorithm first.
       setRoutes(optimal);
-    } catch (e) {
-      console.error('Route search error:', e);
-      setErr(e.message || 'Error calculating the route.');
-    } finally {
-      setLoading(false);
     }
-  };
+  } catch (e) {
+    console.error("Route search error:", e);
+    setErr(e.message || "Error calculating the route.");
+    setRoutes([]); // Ensure routes is an empty array on error
+  } finally {
+    setLoading(false);
+  }
+};
 
   const swapLocations = () => {
     // Swap display names

@@ -9,12 +9,7 @@
 }
 
 /* Ensure these are correctly applied if you're using a custom theme in Tailwind */
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans); /* Assuming these are defined elsewhere or placeholders */
-  --font-mono: var(--font-geist-mono);
-}
+
 
 @media (prefers-color-scheme: dark) {
   :root {
